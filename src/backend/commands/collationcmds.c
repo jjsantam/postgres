@@ -511,7 +511,7 @@ get_icu_locale_comment(const char *localename)
 #endif							/* USE_ICU */
 
 
-#ifdef WIN32
+#if _WIN32_WINNT> = 0x0600
 /* Input type for win32_read_locale() */
 typedef struct ParamStruct
 {
@@ -587,7 +587,7 @@ win32_read_locale(LPWSTR pStr, DWORD dwFlags, LPARAM lparam)
 
 	return (TRUE);
 }
-#endif							/* WIN32 */
+#endif							/* _WIN32_WINNT> = 0x06000 */
 
 /*
  * pg_import_system_collations: add known system collations to pg_collation
@@ -766,7 +766,7 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 	 * Load collations known to WIN32
 	 * Using EnumSystemLocalesEx to enumerate them.
 	 */
-#ifdef WIN32
+#if _WIN32_WINNT> = 0x06000
 	{
 		ParamStruct		param;
 		param.ncreated = &ncreated;
