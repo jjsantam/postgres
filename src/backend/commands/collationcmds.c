@@ -385,7 +385,6 @@ pg_collation_actual_version(PG_FUNCTION_ARGS)
 #define READ_LOCALE_A_OUTPUT
 #endif
 
-#if defined(READ_LOCALE_A_OUTPUT) || defined(USE_ICU)
 /*
  * Check a string to see if it is pure ASCII
  */
@@ -400,7 +399,6 @@ is_all_ascii(const char *str)
 	}
 	return true;
 }
-#endif							/* READ_LOCALE_A_OUTPUT || USE_ICU */
 
 #ifdef READ_LOCALE_A_OUTPUT
 /*
@@ -513,6 +511,84 @@ get_icu_locale_comment(const char *localename)
 #endif							/* USE_ICU */
 
 
+#ifdef WIN32
+/* Input type for win32_read_locale() */
+typedef struct ParamStruct
+{
+	int			*ncreated;
+	Oid			nspid;
+} ParamStruct;
+
+/*
+ * EnumSystemLocalesEx() in pg_import_system_collations() enumerates locales
+ * by making repeated calls to this callback function.
+ */
+BOOL CALLBACK
+win32_read_locale(LPWSTR pStr, DWORD dwFlags, LPARAM lparam)
+{
+	ParamStruct	*param = (ParamStruct *) lparam;
+	char		localebuf[NAMEDATALEN];
+	Oid			collid;
+	int			result;
+	int			enc;
+
+	(void) dwFlags;
+
+	result = WideCharToMultiByte(CP_ACP, 0, pStr, -1, localebuf, NAMEDATALEN,
+								 NULL, NULL);
+
+	/* A zero return is failure */
+	if (result == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+		elog(DEBUG1, "locale name too long, skipped: \"%s\"", localebuf);
+
+	/* The lenght is in bytes, including '\0' */
+	if (result <= 1)
+		return (TRUE);
+
+	/*
+	 * Windows' locale names are known, and currently consist entirely of
+	 * ASCII letters, but check it anyway.
+	 */
+	if (!is_all_ascii(localebuf))
+	{
+		elog(DEBUG1, "locale name has non-ASCII characters, skipped: \"%s\"", localebuf);
+		return (TRUE);
+	}
+
+	enc = pg_get_encoding_from_locale(localebuf, false);
+	if (enc < 0)
+	{
+		/* error message printed by pg_get_encoding_from_locale() */
+		return (TRUE);
+	}
+	if (!PG_VALID_BE_ENCODING(enc))
+		return (TRUE);		/* ignore locales for client-only encodings */
+	if (enc == PG_SQL_ASCII)
+		return (TRUE);		/* C/POSIX are already in the catalog */
+
+	/*
+	 * Create a collation named the same as the locale, but quietly doing
+	 * nothing if it already exists. It's convenient for later import runs,
+	 * since you just about always want to add on new locales without a lot of
+	 * chatter about existing ones. Windows will use hyphens between language
+	 * and territory, where ANSI uses an underscore.
+	 */
+	collid = CollationCreate(localebuf, param->nspid, GetUserId(),
+							 COLLPROVIDER_LIBC, true, enc,
+							 localebuf, localebuf,
+							 get_collation_actual_version(COLLPROVIDER_LIBC, localebuf),
+							 true, true);
+	if (OidIsValid(collid))
+	{
+		(*(param->ncreated))++;
+
+		CommandCounterIncrement();
+	}
+
+	return (TRUE);
+}
+#endif							/* WIN32 */
+
 /*
  * pg_import_system_collations: add known system collations to pg_collation
  */
@@ -522,7 +598,7 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 	Oid			nspid = PG_GETARG_OID(0);
 	int			ncreated = 0;
 
-	/* silence compiler warning if we have no locale implementation at all */
+
 	(void) nspid;
 
 	if (!superuser())
@@ -685,6 +761,25 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 					(errmsg("no usable system locales were found")));
 	}
 #endif							/* READ_LOCALE_A_OUTPUT */
+
+	/* 
+	 * Load collations known to WIN32
+	 * Using EnumSystemLocalesEx to enumerate them.
+	 */
+#ifdef WIN32
+	{
+		ParamStruct		param;
+		param.ncreated = &ncreated;
+		param.nspid = nspid;
+
+		if (!EnumSystemLocalesEx(win32_read_locale, LOCALE_ALL,
+								 (LPARAM) &param, NULL))
+			ereport(ERROR,
+					(GetLastError(),
+					 errmsg("could not execute command \"%s\": %m",
+							"EnumSystemLocalesEx")));
+	}
+#endif
 
 	/*
 	 * Load collations known to ICU
