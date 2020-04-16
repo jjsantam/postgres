@@ -23,7 +23,7 @@ build_script:
 test_script:
   - set HOME=.
   - set PATH=C:/msys64/usr/bin;%PATH%
-  - sh -l -c "make -j$((`nproc`+1)) check-world COPT=-Werror"
+  - sh -l -c "make check-world COPT=-Werror"
 
 on_failure:
   - set HOME=.
