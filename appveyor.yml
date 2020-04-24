@@ -1,5 +1,7 @@
 image: Visual Studio 2019
 
 before_build:
-  - perl -MCPAN -e 'install Win32::Registry'
+  - SET "PERL5LIB=C:\strawberry\c\lib;C:\strawberry\perl\site\lib;C:\strawberry\perl\lib;%PERL5LIB%"
+  - SET "PATH=C:\strawberry\c\bin;C:\strawberry\perl\site\bin;C:\strawberry\perl\bin;%PATH%"
+  - cpan install Win32::Registry
   - perl src/tools/win32tzlist.pl
