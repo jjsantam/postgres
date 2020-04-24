@@ -1,6 +1,5 @@
 image: Visual Studio 2019
 
 before_build:
-  - C:\Strawberry\perl\bin\cpan install CPAN::Author
-  - C:\Strawberry\perl\bin\cpan install Win32::Registry
-  - C:\Strawberry\perl\bin\perl src/tools/win32tzlist.pl
+  - perl -MCPAN -e 'install Win32::Registry'
+  - perl src/tools/win32tzlist.pl
