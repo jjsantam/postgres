@@ -1,5 +1,6 @@
 image: Visual Studio 2019
 
 before_build:
+  - cpan install CPAN::Author
   - cpan install Win32::Registry
   - perl src/tools/win32tzlist.pl
