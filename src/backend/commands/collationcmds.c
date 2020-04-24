@@ -523,7 +523,7 @@ typedef struct ParamStruct
  * EnumSystemLocalesEx() in pg_import_system_collations() enumerates locales
  * by making repeated calls to this callback function.
  */
-BOOL CALLBACK
+static BOOL CALLBACK
 win32_read_locale(LPWSTR pStr, DWORD dwFlags, LPARAM lparam)
 {
 	ParamStruct	*param = (ParamStruct *) lparam;
