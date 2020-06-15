@@ -1,3 +1,5 @@
+image:
+  - Visual Studio 2013
 install:
   - appveyor-retry cinst winflexbison
   - rename c:\ProgramData\chocolatey\bin\win_flex.exe flex.exe
