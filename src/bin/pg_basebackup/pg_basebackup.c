@@ -404,15 +404,15 @@ usage(void)
 	printf(_("  -S, --slot=SLOTNAME    replication slot to use\n"));
 	printf(_("  -v, --verbose          output verbose messages\n"));
 	printf(_("  -V, --version          output version information, then exit\n"));
+	printf(_("      --manifest-checksums=SHA{224,256,384,512}|CRC32C|NONE\n"
+			 "                         use algorithm for manifest checksums\n"));
+	printf(_("      --manifest-force-encode\n"
+			 "                         hex encode all file names in manifest\n"));
+	printf(_("      --no-estimate-size do not estimate backup size in server side\n"));
+	printf(_("      --no-manifest      suppress generation of backup manifest\n"));
 	printf(_("      --no-slot          prevent creation of temporary replication slot\n"));
 	printf(_("      --no-verify-checksums\n"
 			 "                         do not verify checksums\n"));
-	printf(_("      --no-estimate-size do not estimate backup size in server side\n"));
-	printf(_("      --no-manifest      suppress generation of backup manifest\n"));
-	printf(_("      --manifest-force-encode\n"
-			 "                         hex encode all filenames in manifest\n"));
-	printf(_("      --manifest-checksums=SHA{224,256,384,512}|CRC32C|NONE\n"
-			 "                         use algorithm for manifest checksums\n"));
 	printf(_("  -?, --help             show this help, then exit\n"));
 	printf(_("\nConnection options:\n"));
 	printf(_("  -d, --dbname=CONNSTR   connection string\n"));
@@ -1050,7 +1050,8 @@ ReceiveTarFile(PGconn *conn, PGresult *res, int rownum)
 #ifdef HAVE_LIBZ
 			if (compresslevel != 0)
 			{
-				int		fd = dup(fileno(stdout));
+				int			fd = dup(fileno(stdout));
+
 				if (fd < 0)
 				{
 					pg_log_error("could not duplicate stdout: %m");
@@ -1207,7 +1208,12 @@ ReceiveTarFile(PGconn *conn, PGresult *res, int rownum)
 							time(NULL));
 
 			writeTarData(&state, header, sizeof(header));
-			writeTarData(&state, zerobuf, 511);
+
+			/*
+			 * we don't need to pad out to a multiple of the tar block size
+			 * here, because the file is zero length, which is a multiple of
+			 * any block size.
+			 */
 		}
 	}
 
@@ -1219,7 +1225,7 @@ ReceiveTarFile(PGconn *conn, PGresult *res, int rownum)
 	if (strcmp(basedir, "-") == 0 && manifest)
 	{
 		char		header[512];
-		PQExpBufferData	buf;
+		PQExpBufferData buf;
 
 		initPQExpBuffer(&buf);
 		ReceiveBackupManifestInMemory(conn, &buf);
@@ -2499,7 +2505,8 @@ main(int argc, char **argv)
 
 		if (no_slot)
 		{
-			pg_log_error("--create-slot and --no-slot are incompatible options");
+			pg_log_error("%s and %s are incompatible options",
+						 "--create-slot", "--no-slot");
 			fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 					progname);
 			exit(1);
@@ -2537,7 +2544,8 @@ main(int argc, char **argv)
 
 	if (showprogress && !estimatesize)
 	{
-		pg_log_error("--progress and --no-estimate-size are incompatible options");
+		pg_log_error("%s and %s are incompatible options",
+					 "--progress", "--no-estimate-size");
 		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 				progname);
 		exit(1);
@@ -2545,7 +2553,8 @@ main(int argc, char **argv)
 
 	if (!manifest && manifest_checksums != NULL)
 	{
-		pg_log_error("--no-manifest and --manifest-checksums are incompatible options");
+		pg_log_error("%s and %s are incompatible options",
+					 "--no-manifest", "--manifest-checksums");
 		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 				progname);
 		exit(1);
@@ -2553,7 +2562,8 @@ main(int argc, char **argv)
 
 	if (!manifest && manifest_force_encode)
 	{
-		pg_log_error("--no-manifest and --manifest-force-encode are incompatible options");
+		pg_log_error("%s and %s are incompatible options",
+					 "--no-manifest", "--manifest-force-encode");
 		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 				progname);
 		exit(1);

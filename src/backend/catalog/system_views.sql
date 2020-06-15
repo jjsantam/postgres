@@ -642,16 +642,16 @@ CREATE VIEW pg_statio_all_tables AS
             pg_stat_get_blocks_fetched(T.oid) -
                     pg_stat_get_blocks_hit(T.oid) AS toast_blks_read,
             pg_stat_get_blocks_hit(T.oid) AS toast_blks_hit,
-            sum(pg_stat_get_blocks_fetched(X.indexrelid) -
-                    pg_stat_get_blocks_hit(X.indexrelid))::bigint AS tidx_blks_read,
-            sum(pg_stat_get_blocks_hit(X.indexrelid))::bigint AS tidx_blks_hit
+            pg_stat_get_blocks_fetched(X.indexrelid) -
+                    pg_stat_get_blocks_hit(X.indexrelid) AS tidx_blks_read,
+            pg_stat_get_blocks_hit(X.indexrelid) AS tidx_blks_hit
     FROM pg_class C LEFT JOIN
             pg_index I ON C.oid = I.indrelid LEFT JOIN
             pg_class T ON C.reltoastrelid = T.oid LEFT JOIN
             pg_index X ON T.oid = X.indrelid
             LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
     WHERE C.relkind IN ('r', 't', 'm')
-    GROUP BY C.oid, N.nspname, C.relname, T.oid, X.indrelid;
+    GROUP BY C.oid, N.nspname, C.relname, T.oid, X.indexrelid;
 
 CREATE VIEW pg_statio_sys_tables AS
     SELECT * FROM pg_statio_all_tables
@@ -812,7 +812,8 @@ CREATE VIEW pg_stat_wal_receiver AS
             s.status,
             s.receive_start_lsn,
             s.receive_start_tli,
-            s.received_lsn,
+            s.written_lsn,
+            s.flushed_lsn,
             s.received_tli,
             s.last_msg_send_time,
             s.last_msg_receipt_time,
@@ -1461,6 +1462,19 @@ REVOKE EXECUTE ON FUNCTION pg_read_file(text,bigint,bigint,boolean) FROM public;
 REVOKE EXECUTE ON FUNCTION pg_read_binary_file(text) FROM public;
 REVOKE EXECUTE ON FUNCTION pg_read_binary_file(text,bigint,bigint) FROM public;
 REVOKE EXECUTE ON FUNCTION pg_read_binary_file(text,bigint,bigint,boolean) FROM public;
+
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_advance(text, pg_lsn) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_create(text) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_drop(text) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_oid(text) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_progress(text, boolean) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_session_is_setup() FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_session_progress(boolean) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_session_reset() FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_session_setup(text) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_xact_reset() FROM public;
+REVOKE EXECUTE ON FUNCTION pg_replication_origin_xact_setup(pg_lsn, timestamp with time zone) FROM public;
+REVOKE EXECUTE ON FUNCTION pg_show_replication_origin_status() FROM public;
 
 REVOKE EXECUTE ON FUNCTION pg_stat_file(text) FROM public;
 REVOKE EXECUTE ON FUNCTION pg_stat_file(text,boolean) FROM public;

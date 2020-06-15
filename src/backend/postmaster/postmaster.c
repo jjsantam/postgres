@@ -357,7 +357,7 @@ bool		redirection_done = false;	/* stderr redirected for syslogger? */
 /* received START_AUTOVAC_LAUNCHER signal */
 static volatile sig_atomic_t start_autovac_launcher = false;
 
-/* the launcher needs to be signalled to communicate some condition */
+/* the launcher needs to be signaled to communicate some condition */
 static volatile bool avlauncher_needs_signal = false;
 
 /* received START_WALRECEIVER signal */
@@ -404,7 +404,7 @@ static void BackendRun(Port *port) pg_attribute_noreturn();
 static void ExitPostmaster(int status) pg_attribute_noreturn();
 static int	ServerLoop(void);
 static int	BackendStartup(Port *port);
-static int	ProcessStartupPacket(Port *port, bool secure_done);
+static int	ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done);
 static void SendNegotiateProtocolVersion(List *unrecognized_protocol_options);
 static void processCancelRequest(Port *port, void *pkt);
 static int	initMasks(fd_set *rmask);
@@ -1914,11 +1914,15 @@ initMasks(fd_set *rmask)
  * send anything to the client, which would typically be appropriate
  * if we detect a communications failure.)
  *
- * Set secure_done when negotiation of an encrypted layer (currently, TLS or
- * GSSAPI) is already completed.
+ * Set ssl_done and/or gss_done when negotiation of an encrypted layer
+ * (currently, TLS or GSSAPI) is completed. A successful negotiation of either
+ * encryption layer sets both flags, but a rejected negotiation sets only the
+ * flag for that layer, since the client may wish to try the other one. We
+ * should make no assumption here about the order in which the client may make
+ * requests.
  */
 static int
-ProcessStartupPacket(Port *port, bool secure_done)
+ProcessStartupPacket(Port *port, bool ssl_done, bool gss_done)
 {
 	int32		len;
 	void	   *buf;
@@ -1951,7 +1955,7 @@ ProcessStartupPacket(Port *port, bool secure_done)
 	if (pq_getbytes(((char *) &len) + 1, 3) == EOF)
 	{
 		/* Got a partial length word, so bleat about that */
-		if (!secure_done)
+		if (!ssl_done && !gss_done)
 			ereport(COMMERROR,
 					(errcode(ERRCODE_PROTOCOL_VIOLATION),
 					 errmsg("incomplete startup packet")));
@@ -2003,7 +2007,7 @@ ProcessStartupPacket(Port *port, bool secure_done)
 		return STATUS_ERROR;
 	}
 
-	if (proto == NEGOTIATE_SSL_CODE && !secure_done)
+	if (proto == NEGOTIATE_SSL_CODE && !ssl_done)
 	{
 		char		SSLok;
 
@@ -2032,11 +2036,15 @@ retry1:
 		if (SSLok == 'S' && secure_open_server(port) == -1)
 			return STATUS_ERROR;
 #endif
-		/* regular startup packet, cancel, etc packet should follow... */
-		/* but not another SSL negotiation request */
-		return ProcessStartupPacket(port, true);
+
+		/*
+		 * regular startup packet, cancel, etc packet should follow, but not
+		 * another SSL negotiation request, and a GSS request should only
+		 * follow if SSL was rejected (client may negotiate in either order)
+		 */
+		return ProcessStartupPacket(port, true, SSLok == 'S');
 	}
-	else if (proto == NEGOTIATE_GSS_CODE && !secure_done)
+	else if (proto == NEGOTIATE_GSS_CODE && !gss_done)
 	{
 		char		GSSok = 'N';
 #ifdef ENABLE_GSS
@@ -2059,8 +2067,13 @@ retry1:
 		if (GSSok == 'G' && secure_open_gssapi(port) == -1)
 			return STATUS_ERROR;
 #endif
-		/* Won't ever see more than one negotiation request */
-		return ProcessStartupPacket(port, true);
+
+		/*
+		 * regular startup packet, cancel, etc packet should follow, but not
+		 * another GSS negotiation request, and an SSL request should only
+		 * follow if GSS was rejected (client may negotiate in either order)
+		 */
+		return ProcessStartupPacket(port, GSSok == 'G', true);
 	}
 
 	/* Could add additional special packet types here */
@@ -3468,7 +3481,7 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 	 * We only log messages and send signals if this is the first process
 	 * crash and we're not doing an immediate shutdown; otherwise, we're only
 	 * here to update postmaster's idea of live processes.  If we have already
-	 * signalled children, nonzero exit status is to be expected, so don't
+	 * signaled children, nonzero exit status is to be expected, so don't
 	 * clutter log.
 	 */
 	take_action = !FatalError && Shutdown != ImmediateShutdown;
@@ -4412,7 +4425,7 @@ BackendInitialize(Port *port)
 	 * Receive the startup packet (which might turn out to be a cancel request
 	 * packet).
 	 */
-	status = ProcessStartupPacket(port, false);
+	status = ProcessStartupPacket(port, false, false);
 
 	/*
 	 * Stop here if it was bad or a cancel packet.  ProcessStartupPacket
@@ -5602,7 +5615,7 @@ StartAutovacuumWorker(void)
 	 * might not even be connected to shared memory, so don't try to call
 	 * AutoVacWorkerFailed.)  Note that we also need to signal it so that it
 	 * responds to the condition, but we don't do that here, instead waiting
-	 * for ServerLoop to do it.  This way we avoid a ping-pong signalling in
+	 * for ServerLoop to do it.  This way we avoid a ping-pong signaling in
 	 * quick succession between the autovac launcher and postmaster in case
 	 * things get ugly.
 	 */
