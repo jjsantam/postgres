@@ -9,9 +9,7 @@ install:
   - cmd: if not exist "C:\strawberry" cinst strawberryperl
   - cmd: set PERL5LIB=C:\strawberry\c\lib;C:\strawberry\perl\site\lib;C:\strawberry\perl\lib;%PERL5LIB%
   - cmd: set PATH=C:\strawberry\perl\bin;C:\strawberry\perl\site\bin;C:\strawberry\c\bin;%PATH%
-  - perl -v
-  - cpan App::cpanminus
-  - cpanm IPC::Run
+  - cpan force install IPC::Run
 
 configuration:
   - Release
