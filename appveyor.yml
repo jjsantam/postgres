@@ -18,4 +18,4 @@ build:
 
 test_script:
   - cd src/tools/msvc && vcregress check
-  - cd src/tools/msvc && vcregress ecpgcheck
+  - cd src/tools/msvc && vcregress bincheck
