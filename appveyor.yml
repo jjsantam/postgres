@@ -11,6 +11,7 @@ install:
   - cmd: set PATH=C:\strawberry\perl\bin;C:\strawberry\perl\site\bin;C:\strawberry\c\bin;%PATH%
   - cpan install App::cpanminus
   - cpanm --notest IPC::Run
+  - cpanm Win32::Symlink
 
 configuration:
   - Release

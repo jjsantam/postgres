@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 
 =pod
 
@@ -1763,4 +1762,3 @@ sub command_checks_all
 =cut
 
 1;
->>>>>>> upstream/master
