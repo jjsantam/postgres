@@ -6,16 +6,7 @@ use warnings;
 use File::Copy;
 use File::Path qw(rmtree);
 use TestLib;
-use Test::More;
-if ($windows_os)
-{
-	plan skip_all => 'symlinks not supported on Windows';
-	exit;
-}
-else
-{
-	plan tests => 5;
-}
+use Test::More tests => 5;
 
 use FindBin;
 use lib $FindBin::RealBin;
