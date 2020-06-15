@@ -876,14 +876,6 @@ sub command_checks_all
 
 =pod
 
-=back
-
-=cut
-
-1;
-
-=pod
-
 =head1 NAME
 
 TestLib - helper module for writing PostgreSQL's C<prove> tests.
