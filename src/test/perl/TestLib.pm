@@ -881,7 +881,6 @@ sub command_checks_all
 =cut
 
 1;
-=======
 
 =pod
 
