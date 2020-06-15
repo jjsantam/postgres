@@ -11,9 +11,7 @@ configuration:
   - Release
 
 before_build:
-  - SET "PERL5LIB=C:\strawberry\c\lib;C:\strawberry\perl\site\lib;C:\strawberry\perl\lib;%PERL5LIB%"
-  - SET "PATH=C:\strawberry\c\bin;C:\strawberry\perl\site\bin;C:\strawberry\perl\bin;%PATH%"
-  - cpan install IPC::Run
+  - cpanm IPC::Run
   - perl src/tools/msvc/mkvcbuild.pl
 
 build:
